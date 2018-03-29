@@ -70,33 +70,37 @@ function debounce(func, wait, options) {
     timerId,
     lastCallTime
 
-  let lastInvokeTime = 0
+  // 初始化参数
+  let lastInvokeTime = 0  // func 最近一次执行时间
   let leading = false
   let maxing = false
   let trailing = true
 
   // Bypass `requestAnimationFrame` by explicitly setting `wait=0`.
+  // 设置 `wait=0` 绕开 RAF
   const useRAF = (!wait && wait !== 0 && typeof root.requestAnimationFrame === 'function')
 
+  // 检测类型
   if (typeof func != 'function') {
     throw new TypeError('Expected a function')
   }
   wait = +wait || 0
   if (isObject(options)) {
     leading = !!options.leading
-    maxing = 'maxWait' in options
+    maxing = 'maxWait' in options  // 判断是否有 `maxWait` 参数
     maxWait = maxing ? Math.max(+options.maxWait || 0, wait) : maxWait
     trailing = 'trailing' in options ? !!options.trailing : trailing
   }
 
+  // 调用 Func
   function invokeFunc(time) {
     const args = lastArgs
     const thisArg = lastThis
 
-    lastArgs = lastThis = undefined
+    lastArgs = lastThis = undefined  // 调用 invokeFunc 会清除 lastArg 和 lastThis
     lastInvokeTime = time
     result = func.apply(thisArg, args)
-    return result
+    return result // 返回调用函数值
   }
 
   function startTimer(pendingFunc, wait) {
@@ -113,25 +117,31 @@ function debounce(func, wait, options) {
     clearTimeout(id)
   }
 
+  // 前缘方法
   function leadingEdge(time) {
-    // Reset any `maxWait` timer.
+    // Reset any `maxWait` timer.  重置由上一次 maxing 产生的 lastInvokeTime 的变化
     lastInvokeTime = time
-    // Start the timer for the trailing edge.
+    // Start the timer for the trailing edge.  为触发 trailing edge 设置定时器
     timerId = startTimer(timerExpired, wait)
-    // Invoke the leading edge.
+    // Invoke the leading edge.  前缘触发执行 func
     return leading ? invokeFunc(time) : result
   }
 
+  // 计算 wait 时间
   function remainingWait(time) {
-    const timeSinceLastCall = time - lastCallTime
-    const timeSinceLastInvoke = time - lastInvokeTime
-    const timeWaiting = wait - timeSinceLastCall
+    const timeSinceLastCall = time - lastCallTime // 距离上一次 debounced 函数被调用的时间
+    const timeSinceLastInvoke = time - lastInvokeTime  //距离上一次 func 函数被执行的时间
+    const timeWaiting = wait - timeSinceLastCall // 用 wait 减去 timeSinceLastCall 计算出下一次 trailing 的时间
 
+    // maxWait - timeSinceLastInvoke 最大等待时间 - 距离上次 func 函数执行时间 
+    // maxing = true => 比较 下一次 trailing 时间 和 下一次 maxing 时间 的小值
+    // maxing = false => 下一次 trailing 时间
     return maxing
       ? Math.min(timeWaiting, maxWait - timeSinceLastInvoke)
       : timeWaiting
   }
 
+  // 判断 func 能否被执行
   function shouldInvoke(time) {
     const timeSinceLastCall = time - lastCallTime
     const timeSinceLastInvoke = time - lastInvokeTime
@@ -139,16 +149,19 @@ function debounce(func, wait, options) {
     // Either this is the first call, activity has stopped and we're at the
     // trailing edge, the system time has gone backwards and we're treating
     // it as the trailing edge, or we've hit the `maxWait` limit.
-    return (lastCallTime === undefined || (timeSinceLastCall >= wait) ||
-      (timeSinceLastCall < 0) || (maxing && timeSinceLastInvoke >= maxWait))
+    return (lastCallTime === undefined  // 首次
+        || (timeSinceLastCall >= wait)  // 距离上次 debounced 被调用 是否 大于 wait 时间
+        || (timeSinceLastCall < 0)  // 系统时间倒退
+        || (maxing && timeSinceLastInvoke >= maxWait)) // 有 maxTime， 是否超过最大等待时间
   }
 
   function timerExpired() {
     const time = Date.now()
+    // 在 后缘状态，并能够执行 func 条件下， 调用 trailingEdge 函数
     if (shouldInvoke(time)) {
       return trailingEdge(time)
     }
-    // Restart the timer.
+    // Restart the timer.  重启 定时器，计算 wait 时间
     timerId = startTimer(timerExpired, remainingWait(time))
   }
 
@@ -157,9 +170,11 @@ function debounce(func, wait, options) {
 
     // Only invoke if we have `lastArgs` which means `func` has been
     // debounced at least once.
+    // 有 lastArgs 才执行，意味着只有 func 已经被 debounced 过一次之后 才能在 后缘执行
     if (trailing && lastArgs) {
       return invokeFunc(time)
     }
+    // 每次后缘执行都会清除 lastArgs 和 lastThis，目的是避免 最后一次函数被执行两次
     lastArgs = lastThis = undefined
     return result
   }
